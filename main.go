@@ -16,13 +16,13 @@ func main() {
 
 	cfg, err := config.LoadConfig(context.Background())
 	if err != nil {
-		slog.Error("failed to load config", err)
+		slog.Error("failed to load config", slog.String("err", err.Error()))
 		os.Exit(1)
 	}
 
 	mongoClient, err := mongo.NewClient(context.TODO(), cfg.MongoConfig)
 	if err != nil {
-		slog.Error("failed to connect to mongo db", err)
+		slog.Error("failed to connect to mongo db", slog.String("err", err.Error()))
 		os.Exit(1)
 	}
 
