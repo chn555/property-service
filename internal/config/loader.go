@@ -25,7 +25,7 @@ func NewLoader[C any](envVarsPrefix string, defaultConfigFilePath string) *Loade
 }
 
 func NewDefaultLoader[C any]() *Loader[C] {
-	return &Loader[C]{envVarsPrefix: "BLANKET_", defaultConfigFilePath: "config.yaml"}
+	return &Loader[C]{envVarsPrefix: "PROP_", defaultConfigFilePath: "config.yaml"}
 }
 
 func (l Loader[C]) LoadConfig() (*C, error) {
