@@ -1,4 +1,4 @@
-package main
+package rest
 
 import (
 	"encoding/base64"
@@ -11,7 +11,7 @@ type NextToken struct {
 	Offset int
 }
 
-func decodeNextToken(token string) (*NextToken, error) {
+func DecodeNextToken(token string) (*NextToken, error) {
 	b, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode token: %v", err)
@@ -24,7 +24,7 @@ func decodeNextToken(token string) (*NextToken, error) {
 	return t, nil
 }
 
-func createNextToken(limit int, offset int) (string, error) {
+func CreateNextToken(limit int, offset int) (string, error) {
 	token := &NextToken{
 		Limit:  limit,
 		Offset: offset,

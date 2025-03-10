@@ -1,0 +1,6 @@
+mongoConfig:
+  uri: mongodb://localhost:27017
+  timeout: 30s
+mongoEventStateConfig:
+  databaseName: "property"
+  collectionName: "events"

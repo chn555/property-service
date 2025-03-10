@@ -22,7 +22,7 @@ type EventStateConfig struct {
 	CollectionName string
 }
 
-func NewEventState(client *mongo.Client, config *EventStateConfig) *EventState {
+func NewEventState(client *mongo.Client, config EventStateConfig) *EventState {
 	database := client.Database(config.DatabaseName)
 	collection := database.Collection(config.CollectionName)
 	return &EventState{

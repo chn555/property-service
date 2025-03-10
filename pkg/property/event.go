@@ -22,22 +22,6 @@ type EventFilter struct {
 	AmountType AmountType
 }
 
-type EventStore interface {
-	SaveEvent(ctx context.Context, event *Event) error
-	GetEventsForFilter(ctx context.Context, filter *EventFilter, limit int, offset int) ([]*Event, error)
-	GetMostRecentEventForFilter(ctx context.Context, filter *EventFilter) (*Event, bool, error)
-}
-
-type Handler struct {
-	store EventStore
-}
-
-func NewHandler(store EventStore) *Handler {
-	return &Handler{
-		store: store,
-	}
-}
-
 func (h *Handler) SaveEvent(ctx context.Context, PropertyID string, amount float64, date time.Time) (float64, error) {
 	if PropertyID == "" {
 		return 0, fmt.Errorf("empty property ID")
@@ -47,49 +31,21 @@ func (h *Handler) SaveEvent(ctx context.Context, PropertyID string, amount float
 		return 0, fmt.Errorf("invalid date")
 	}
 
-	filter := &EventFilter{
-		PropertyID: PropertyID,
-	}
-
-	state, exists, err := h.store.GetMostRecentEventForFilter(ctx, filter)
+	curBalance, err := h.GetBalance(ctx, PropertyID)
 	if err != nil {
-		return 0, fmt.Errorf("get events for filter: %v", err)
-	}
-	if !exists {
-		state = &Event{
-			PropertyID:       PropertyID,
-			EventAmount:      0,
-			PostEventBalance: 0,
-			Date:             date,
-		}
+		return 0, fmt.Errorf("get balance: %v", err)
 	}
 
-	balance := state.PostEventBalance + amount
 	event := &Event{
 		PropertyID:       PropertyID,
 		EventAmount:      amount,
-		PostEventBalance: balance,
+		PostEventBalance: curBalance + amount,
 		Date:             date,
 	}
 	if err := h.store.SaveEvent(ctx, event); err != nil {
 		return 0, fmt.Errorf("save event: %v", err)
 	}
 	return event.PostEventBalance, nil
-}
-
-func (h *Handler) GetBalance(ctx context.Context, PropertyID string) (float64, error) {
-	if PropertyID == "" {
-		return 0, fmt.Errorf("empty property ID")
-	}
-
-	state, exists, err := h.store.GetMostRecentEventForFilter(ctx, &EventFilter{PropertyID: PropertyID})
-	if err != nil {
-		return 0, fmt.Errorf("get events for filter: %v", err)
-	}
-	if !exists {
-		return 0, nil
-	}
-	return state.PostEventBalance, nil
 }
 
 func (h *Handler) GetPropertyEvents(ctx context.Context, PropertyID string, dateFrom time.Time, dateTo time.Time, sortOrder SortOrder, amountType AmountType, offset int, limit int) ([]*Event, error) {
@@ -110,6 +66,12 @@ func (h *Handler) GetPropertyEvents(ctx context.Context, PropertyID string, date
 		return nil, fmt.Errorf("get events for filter: %v", err)
 	}
 
+	sortByOrder(events, sortOrder)
+
+	return events, nil
+}
+
+func sortByOrder(events []*Event, sortOrder SortOrder) {
 	switch sortOrder {
 	case Ascending:
 		slices.SortFunc(events, func(a, b *Event) int {
@@ -130,40 +92,4 @@ func (h *Handler) GetPropertyEvents(ctx context.Context, PropertyID string, date
 			return 0
 		})
 	}
-
-	return events, nil
-}
-
-func (h *Handler) GetMonthlyReport(ctx context.Context, PropertyID string, month time.Month, year int, offset int, limit int) ([]*Event, float64, error) {
-	if PropertyID == "" {
-		return nil, 0, fmt.Errorf("empty property ID")
-	}
-
-	// Calculate the start and end of the month
-	startOfMonth := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
-	endOfMonth := startOfMonth.AddDate(0, 1, 0).Add(-time.Nanosecond)
-
-	startingBalanceFilter := &EventFilter{
-		PropertyID: PropertyID,
-		BeforeTime: startOfMonth.Add(-1 * time.Millisecond),
-	}
-	startingBalance, exist, err := h.store.GetMostRecentEventForFilter(ctx, startingBalanceFilter)
-	if err != nil {
-		return nil, 0, fmt.Errorf("get events for filter: %v", err)
-	}
-	if !exist {
-		startingBalance = &Event{
-			PropertyID:       PropertyID,
-			EventAmount:      0,
-			PostEventBalance: 0,
-			Date:             startOfMonth,
-		}
-	}
-
-	events, err := h.GetPropertyEvents(ctx, PropertyID, startOfMonth, endOfMonth, Ascending, All, offset, limit)
-	if err != nil {
-		return nil, 0, fmt.Errorf("get property events: %v", err)
-	}
-
-	return events, startingBalance.PostEventBalance, nil
 }
