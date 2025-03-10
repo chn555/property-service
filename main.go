@@ -108,6 +108,53 @@ func main() {
 
 		return c.JSON(200, res)
 	})
+	e.GET("/property/:propertyID/monthly_report", func(c echo.Context) error {
+		req := &GetMonthlyReportReq{}
+		if err := c.Bind(req); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+
+		if err := c.Validate(req); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+
+		if req.NextToken != "" {
+			token, err := decodeNextToken(req.NextToken)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+			}
+			req.Limit = token.Limit
+			req.Offset = token.Offset
+		}
+
+		events, startingBalance, err := h.GetMonthlyReport(context.Background(), req.PropertyID, req.Month, req.Year, req.Offset, req.Limit)
+		if err != nil {
+			return err
+		}
+
+		mappedEvents := lo.Map(events, func(e *property.Event, _ int) *MonthlyReportEvent {
+			return &MonthlyReportEvent{
+				PropertyID:  e.PropertyID,
+				EventAmount: e.EventAmount,
+				Date:        e.Date,
+				Balance:     e.PostEventBalance,
+			}
+		})
+		res := &GetMonthlyReportRes{
+			Events:          mappedEvents,
+			StartingBalance: startingBalance,
+		}
+
+		if len(events) >= req.Limit {
+			nextToken, err := createNextToken(req.Limit, req.Offset+req.Limit)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			}
+			res.NextToken = nextToken
+		}
+
+		return c.JSON(200, res)
+	})
 
 	e.GET("/property/:propertyID/balance", func(c echo.Context) error {
 		propertyID := c.Param("propertyID")
@@ -120,6 +167,7 @@ func main() {
 		}
 		return c.JSON(200, map[string]interface{}{"balance": balance})
 	})
+
 	if err := e.Start(":1323"); err != nil {
 	}
 	e.Logger.Fatal(e.Start(":1323"))
@@ -151,4 +199,25 @@ type Event struct {
 	PropertyID  string    `json:"property_id,omitempty" bson:"property_id"`
 	EventAmount float64   `json:"event_amount" bson:"event_amount"`
 	Date        time.Time `json:"date" bson:"date"`
+}
+
+type MonthlyReportEvent struct {
+	PropertyID  string    `json:"property_id,omitempty" bson:"property_id"`
+	EventAmount float64   `json:"event_amount" bson:"event_amount"`
+	Date        time.Time `json:"date" bson:"date"`
+	Balance     float64   `json:"balance" bson:"balance"`
+}
+
+type GetMonthlyReportReq struct {
+	PropertyID string     `param:"propertyID" validate:"required"`
+	Month      time.Month `query:"month" validate:"required"`
+	Year       int        `query:"year" validate:"gte=1970,lte=2030"`
+	Offset     int        `query:"offset" validate:"omitempty,gt=0"`
+	Limit      int        `query:"limit" validate:"omitempty,gt=0"`
+	NextToken  string     `query:"next_token"`
+}
+type GetMonthlyReportRes struct {
+	StartingBalance float64               `json:"starting_balance"`
+	Events          []*MonthlyReportEvent `json:"events"`
+	NextToken       string                `json:"next_token"`
 }

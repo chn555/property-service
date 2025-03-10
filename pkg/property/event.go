@@ -133,3 +133,37 @@ func (h *Handler) GetPropertyEvents(ctx context.Context, PropertyID string, date
 
 	return events, nil
 }
+
+func (h *Handler) GetMonthlyReport(ctx context.Context, PropertyID string, month time.Month, year int, offset int, limit int) ([]*Event, float64, error) {
+	if PropertyID == "" {
+		return nil, 0, fmt.Errorf("empty property ID")
+	}
+
+	// Calculate the start and end of the month
+	startOfMonth := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+	endOfMonth := startOfMonth.AddDate(0, 1, 0).Add(-time.Nanosecond)
+
+	startingBalanceFilter := &EventFilter{
+		PropertyID: PropertyID,
+		BeforeTime: startOfMonth.Add(-1 * time.Millisecond),
+	}
+	startingBalance, exist, err := h.store.GetMostRecentEventForFilter(ctx, startingBalanceFilter)
+	if err != nil {
+		return nil, 0, fmt.Errorf("get events for filter: %v", err)
+	}
+	if !exist {
+		startingBalance = &Event{
+			PropertyID:       PropertyID,
+			EventAmount:      0,
+			PostEventBalance: 0,
+			Date:             startOfMonth,
+		}
+	}
+
+	events, err := h.GetPropertyEvents(ctx, PropertyID, startOfMonth, endOfMonth, Ascending, All, offset, limit)
+	if err != nil {
+		return nil, 0, fmt.Errorf("get property events: %v", err)
+	}
+
+	return events, startingBalance.PostEventBalance, nil
+}
