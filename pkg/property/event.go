@@ -74,22 +74,32 @@ func (h *Handler) GetPropertyEvents(ctx context.Context, PropertyID string, date
 func sortByOrder(events []*Event, sortOrder SortOrder) {
 	switch sortOrder {
 	case Ascending:
-		slices.SortFunc(events, func(a, b *Event) int {
-			if a.Date.Before(b.Date) {
-				return -1
-			} else if a.Date.After(b.Date) {
-				return 1
-			}
-			return 0
-		})
+		sortByDateAsc(events)
 	case Descending:
-		slices.SortFunc(events, func(a, b *Event) int {
-			if a.Date.After(b.Date) {
-				return -1
-			} else if a.Date.Before(b.Date) {
-				return 1
-			}
-			return 0
-		})
+		sortByDateDesc(events)
+	default:
+		sortByDateDesc(events)
 	}
+}
+
+func sortByDateAsc(events []*Event) {
+	slices.SortFunc(events, func(a, b *Event) int {
+		if a.Date.Before(b.Date) {
+			return -1
+		} else if a.Date.After(b.Date) {
+			return 1
+		}
+		return 0
+	})
+}
+
+func sortByDateDesc(events []*Event) {
+	slices.SortFunc(events, func(a, b *Event) int {
+		if a.Date.After(b.Date) {
+			return -1
+		} else if a.Date.Before(b.Date) {
+			return 1
+		}
+		return 0
+	})
 }
